@@ -1,5 +1,5 @@
 -module(useless).
--export([add/2, hello/0,greet_and_add_two/1,hello_to/2,len/1]).
+-export([add/2, hello/0,greet_and_add_two/1,hello_to/2,len/1,tco_len/1]).
 
 add(A,B)->
     A + B.
@@ -30,6 +30,8 @@ hello_to(_, Name) ->
 
 
 %% !Very interesting!
+%%
+%% Examples taken from: http://learnyousomeerlang.com/recursion
 %% 
 %% len([]) matches on an empty list whereas len([_|T]) matches on a
 %% list with =>1 element it. To which it returns 1+len(T).
@@ -44,3 +46,42 @@ len([]) ->
     0;
 len([_|T]) ->
     1 + len(T).
+
+%% Now, as all good programmers will know, 1 + len(T) will expand out
+%% so that:
+%% 1. len(T) = some number
+%% 2. 1 + some number
+%% 3. return some number (hence the full stop)
+%%
+%% This means that for large calls. Say, a list with a million zillion
+%% items in it. Then you're going to be maintaining a stack through all
+%% that.
+%%
+%% I.e.:
+%%
+%% len([1, 2, ... 1,000,000]) will call len 1,000,000 times before it
+%% returns with 1,000,000. What's more, it will preserve the state in-
+%% between those calls. So that the later values of len(T) can be pushed
+%% up the stack towards those +1's.
+%%
+%% Enter tail-call-optimization.
+%%
+%% Since we don't really need to maintain the stack, because the operation
+%% for what len(T) returns will always be the same (+1 to len(T)) then
+%% we can have that operation be the final call.
+%%
+%% Below:
+%%
+
+%% Separate function which we export, simply passes along the call to
+%% the internal implementation.
+tco_len(L) ->
+    tco_len(L,0).
+
+%% same as before, essentially.
+tco_len([], Val) ->
+    Val;
+%% since the last and only operation is the call to tco_len, Erlang can
+%% throw away the stack since it will never be used again.
+tco_len([_|T], Val) ->
+    tco_len(T, Val+1).
