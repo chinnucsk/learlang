@@ -45,11 +45,11 @@ server(UserList) ->
 login(Username) ->
     % starts a client receive channel.
     register(getmsg, spawn(chatapp, receiver, [])),
-    {server, server@archbox} ! {login, self(), Username},
+    {server, server@archbox} ! {login, node(), Username},
     ok.
 
 logout(Username) ->
-    {server, server@archbox} ! {logout, self(), Username},
+    {server, server@archbox} ! {logout, node(), Username},
     ok.
 
 receiver() ->
@@ -64,5 +64,5 @@ receiver() ->
 sendMessage(To, Message) ->
     % send a message to the server which is intended for a specific
     % recipient.
-    {server, server@archbox} ! {message, self(), To, Message},
+    {server, server@archbox} ! {message, node(), To, Message},
     ok.
