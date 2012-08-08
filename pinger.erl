@@ -5,7 +5,7 @@ ping(Node) ->
     {ponger, Node} ! {ping, self()},
     receive
         pong ->
-            io:format("ok", [])
+            io:format("")
     after
         1000 ->
             io:format("No response!")
