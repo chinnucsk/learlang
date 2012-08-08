@@ -1,27 +1,30 @@
 -module(ponging).
--export([ping/2, pong/0, start/0, something/0]).
+-export([start_ping/1, start_pong/0, ping/2, pong/0]).
 
-ping(0, PongPID) ->
-    PongPID ! finished,
-    io:format("quit pinging!\n");
-ping(N, PongPID) ->
-    PongPID ! {ping, self()},
+ping(0, Node) ->
+    {pong, Node} ! finished,
+    io:format("ping finished~n", []);
+
+ping(N, Node) ->
+    {pong, Node} ! {ping, self()},
     receive
         pong ->
-            io:format("Pong received!\n")
+            io:format("Ping received pong~n", [])
     end,
-    ping(N-1, PongPID).
+    ping(N - 1, Node).
 
 pong() ->
     receive
         finished ->
-            io:format("Stopping ponging\n");
-        {ping, PingPID} ->
-            io:format("Received ping!\n"),
-            PingPID ! pong,
+            io:format("Pong finished~n", []);
+        {ping, Ping_PID} ->
+            io:format("Pong received ping~n", []),
+            Ping_PID ! pong,
             pong()
     end.
 
-start() ->
-    PongPID = spawn(ponging, pong, []),
-    spawn(ponging, ping, [3, PongPID]),
+start_pong() ->
+    register(pong, spawn(ponging, pong, [])).
+
+start_ping(Pong_Node) ->
+    spawn(ponging, ping, [3, Pong_Node]).
