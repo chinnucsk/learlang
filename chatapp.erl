@@ -12,31 +12,28 @@ server(UserList) ->
     receive
 
         {message, From, To, Message} ->
-
 	    case orddict:find(From, UserList) of
 		{ok, _ } ->
-		    ok;
+		    case orddict:find(To, UserList) of
+			{ok, _ } ->
+			    io:format("Message for: ~p. With: ~p~n", [To, Message]),
+			    {getmsg, orddict:fetch(To)} ! {message, Message},
+			    server(UserList);
+			error ->
+			    {getmsg, From} ! {message, "Recipient not found!"},
+			    server(UserList)
+		    end;
 		error ->
-		    {receiver, From} ! {message, "You are not logged in!"},
+		    {getmsg, From} ! {message, "You are not logged in!"},
 		    server(UserList)
-	    end,
-
-	    case orddict:find(To, UserList) of
-		{ok, _ } ->
-		    io:format("Message for: ~p. With: ~p~n", [To, Message]),
-		    {receiver, To} ! {message, Message},
-		    server(UserList);
-		error ->
-		    {receiver, From} ! {message, "Recipient not found!"},
-		    server(UserList)
-	    end.
+	    end;
 
 	{login, From, Who} ->
-	    {receiver, From} ! {message, io_lib:format("Logged in as: ~p~n", [Who])},
-	    server(orddict:append(Who, From, UserList));
+	    {getmsg, From} ! {message, logged_in},
+	    server(orddict:store(Who, From, UserList));
 
 	{logout, From, Who} ->
-	    {receiver, From} ! {message, io_lib:format("Logged out from: ~p~n", [Who])},
+	    {getmsg, From} ! {message, logged_out},
 	    server(orddict:erase(Who, UserList))
 
     after
@@ -47,8 +44,8 @@ server(UserList) ->
 
 login(Username) ->
     % starts a client receive channel.
+    register(getmsg, spawn(chatapp, receiver, [])),
     {server, server@archbox} ! {login, self(), Username},
-    register(receiver, spawn(chatapp, receiver, [])),
     ok.
 
 logout(Username) ->
