@@ -1,6 +1,6 @@
 -module(chatapp).
 -author("Aaron France").
--export([startServer/0,sendMessage/2,server/2,login/1,logout/1,receiver/0]).
+-export([startServer/0,sendMessage/2,send/2,server/2,login/1,logout/1,receiver/0]).
 -define(SERVER, server@FRANCEA1).
 
 %% starts the server and registers it's Pid to server.
@@ -20,14 +20,14 @@ server(UserListA, UserListB) ->
             Return ! orddict:find(From, UserListB),
             server(UserListA, UserListB);
 
-        {message, From, To, Message} ->
+        {message, Return, To, Message} ->
             case orddict:find(To, UserListA) of
                 {ok, _ } ->
-                    io:format("Message for: ~p. With: ~p~n", [To, Message]),
                     {getmsg, orddict:fetch(To, UserListA)} ! {message, Message},
+                    Return ! ok,
                     server(UserListA, UserListB);
                 error ->
-                    {getmsg, From} ! {message, "Recipient not found!"},
+                    Return ! error,
                     server(UserListA, UserListB)
             end;
 
@@ -59,7 +59,7 @@ server(UserListA, UserListB) ->
 
     after
         10000 ->
-            io:format("Polling.....~n"),
+            io:format("~p....~n", [polling]),
             server(UserListA, UserListB)
     end.
 
@@ -70,10 +70,10 @@ login(Username) ->
 
     receive
         {ok, logged_in} ->
-            io:format(logged_in),
+            io:format("~p~n", [logged_in]),
             register(getmsg, spawn(chatapp, receiver, []));
         {error, Message} ->
-            io:format(Message)
+            io:format("~p~n", [Message])
     after
         3000 ->
             io:format("Error logging in")
@@ -83,13 +83,13 @@ login(Username) ->
 %% Logs a user out on the server.
 logout(Username) ->
     {server, ?SERVER} ! {logout, self(), node(), Username},
-
+    
     receive
         {ok, logged_out} ->
-            io:format(logged_out),
+            io:format("~p~n", [logged_out]),
             exit(whereis(getmsg), kill);
         {error, Message} ->
-            io:format(Message)
+            io:format("~p~n", [Message])
     after
         3000 ->
             io:format("Error logging out")
@@ -108,14 +108,30 @@ receiver() ->
     end.
 
 %% Sends Message towards To via the server.
-sendMessage(To, Message) ->
+send(To, Message) ->
     % send a message to the server which is intended for a specific
     % recipient.
     {server, ?SERVER} ! {status, self(), node()},
     receive
         {ok, _ } ->
-            {server, ?SERVER} ! {message, node(), To, Message};
+            sendMessage(To, Message);
         error ->
-            io:format("You are not logged in!")
+            io:format("Not logged in!")
+    after
+        3000 ->
+            io:format("Error communicating with server in send")
+    end.
+
+sendMessage(To, Message) ->
+    {server, ?SERVER} ! {message, self(), To, Message},
+    io:format("~p~n", [self()]),
+    receive
+        ok ->
+            ok;
+        error ->
+            io:format("Recipient not available.")
+    after
+        3000 ->
+            io:format("Error communicating with server in sendMessage")
     end,
     ok.
