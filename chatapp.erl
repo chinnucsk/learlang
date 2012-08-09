@@ -1,12 +1,20 @@
 -module(chatapp).
 -author("Aaron France").
--export([startServer/0,sendMessage/2,send/2,server/2,login/1,logout/1,receiver/0]).
+-export([startServer/0,sendMessage/2,send/2,server/2,login/1,logout/1,receiver/0,newServer/0]).
 -define(SERVER, server@FRANCEA1).
+
+newServer() ->
+    spawn(?MODULE, startServer, []).
 
 %% starts the server and registers it's Pid to server.
 startServer() ->
-    register(server, spawn(chatapp, server, [orddict:new(),orddict:new()])),
-    ok.
+    process_flag(trap_exit, true),
+    register(server, spawn_link(?MODULE, server, [orddict:new(),orddict:new()])),
+    receive
+        {'EXIT', Pid, _ } ->
+            io:format("Restarting process: ~p~n", [Pid]),
+            startServer()
+    end.
 
 %% recursive loop which constantly reads it's mailbox to find
 %% instructions from clients.
@@ -16,6 +24,8 @@ startServer() ->
 server(UserListA, UserListB) ->
 
     receive
+        die ->
+            1/0;
         {status, Return, From} ->
             Return ! orddict:find(From, UserListB),
             server(UserListA, UserListB);
@@ -30,7 +40,10 @@ server(UserListA, UserListB) ->
                     Return ! error,
                     server(UserListA, UserListB)
             end;
-
+        
+        %% When we receive the 'login' atom we login the user by adding their
+        %% node value as a key along with their username that they suppled
+        %% as well as the reverse so we can do reverse lookups.
         {login, Return, From, Who} ->
             case orddict:find(Who, UserListA) of
                 {ok, _ } ->
@@ -65,9 +78,10 @@ server(UserListA, UserListB) ->
 
 %% Logs a user onto the server.
 login(Username) ->
+    % if we try to log in twice, kill our message queue.
+    {getmsg, node()} ! exit,
     % starts a client receive channel.
     {server, ?SERVER} ! {login, self(), node(), Username},
-
     receive
         {ok, logged_in} ->
             io:format("~p~n", [logged_in]),
@@ -104,7 +118,9 @@ receiver() ->
     receive
         {message, Message} ->
             io:format("~p~n", [Message]),
-            receiver()
+            receiver();
+        exit ->
+            exit(self(), kill)
     end.
 
 %% Checks if the user is logged in and, if so, sends the message to
