@@ -107,7 +107,8 @@ receiver() ->
             receiver()
     end.
 
-%% Sends Message towards To via the server.
+%% Checks if the user is logged in and, if so, sends the message to
+%% their recipient.
 send(To, Message) ->
     % send a message to the server which is intended for a specific
     % recipient.
