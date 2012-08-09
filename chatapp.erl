@@ -87,10 +87,10 @@ login(Username) ->
             io:format("~p~n", [logged_in]),
             register(getmsg, spawn(chatapp, receiver, []));
         {error, Message} ->
-            io:format("~p~n", [Message])
+            Message
     after
         3000 ->
-            io:format("Error logging in")
+            error_logging_in
     end,
     ok.
 
@@ -106,7 +106,7 @@ logout(Username) ->
             io:format("~p~n", [Message])
     after
         3000 ->
-            io:format("Error logging out")
+            error_logging_out
     end,
     ok.
 
@@ -133,10 +133,10 @@ send(To, Message) ->
         {ok, _ } ->
             sendMessage(To, Message);
         error ->
-            io:format("Not logged in!")
+            not_logged_in
     after
         3000 ->
-            io:format("Error communicating with server in send")
+            server_error
     end.
 
 sendMessage(To, Message) ->
@@ -146,9 +146,9 @@ sendMessage(To, Message) ->
         ok ->
             ok;
         error ->
-            io:format("Recipient not available.")
+            recipient_not_available
     after
         3000 ->
-            io:format("Error communicating with server in sendMessage")
+            server_error
     end,
     ok.
