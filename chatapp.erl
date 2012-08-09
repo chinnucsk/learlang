@@ -14,7 +14,6 @@ startServer() ->
 %% We can deal with handling messages to clients and logging
 %% in and out.
 server(UserList) ->
-
     receive
         {message, From, To, Message} ->
             case orddict:find(To, UserList) of
@@ -26,15 +25,27 @@ server(UserList) ->
                     {getmsg, From} ! {message, "Recipient not found!"},
                     server(UserList)
             end;
-        
-        {login, From, Who} ->
-            {getmsg, From} ! {message, logged_in},
-            server(orddict:store(Who, From, UserList));
-        
-        {logout, From, Who} ->
-            {getmsg, From} ! {message, logged_out},
-            server(orddict:erase(Who, UserList))
-    
+
+        {login, Return, From, Who} ->
+            case orddict:find(Who, UserList) of
+                {ok, _ } ->
+                    Return ! {error, "Already logged in"},
+                    server(UserList);
+                error ->
+                    Return ! {ok, logged_in},
+                    server(orddict:store(Who, From, UserList))
+            end;
+
+        {logout, Return, Who} ->
+            case orddict:find(Who, UserList) of
+                {ok, _ } ->
+                    Return ! {ok, logged_out},
+                    server(orddict:erase(Who, UserList));
+                error  ->
+                    Return ! {error, "You were not logged in!"},
+                    server(UserList)
+            end
+
     after
         10000 ->
             io:format("Polling.....~n"),
@@ -44,14 +55,30 @@ server(UserList) ->
 %% Logs a user onto the server.
 login(Username) ->
     % starts a client receive channel.
-    register(getmsg, spawn(chatapp, receiver, [])),
-    {server, ?SERVER} ! {login, node(), Username},
+    {server, ?SERVER} ! {login, self(), node(), Username},
+
+    receive
+        {ok, logged_in} ->
+            io:format(logged_in),
+            register(getmsg, spawn(chatapp, receiver, []));
+        {error, Message} ->
+            io:format(Message)
+    after
+        3000 ->
+            io:format("Error logging in")
+    end,
     ok.
 
 %% Logs a user out on the server.
 logout(Username) ->
-    {server, ?SERVER} ! {logout, node(), Username},
-    exit(whereis(getmsg), kill),
+    {server, ?SERVER} ! {logout, self(), Username},
+    receive
+        {ok, logged_out} ->
+            io:format(logged_out),
+            exit(whereis(getmsg), kill);
+        {error, Message} ->
+            io:format(Message)
+    end,
     ok.
 
 %% Executes the receive loop. This call will block so use the login
